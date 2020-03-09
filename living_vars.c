@@ -29,18 +29,6 @@ typedef struct list_t {
 } list_t;
 
 /******************************* WORK WITH LIST *******************************/
-static void add_to_list(list_t *list, Blk *blk, int blk_index) {
-	node_t *node = (node_t *) malloc(sizeof(node_t));
-	node->info.blk = blk;
-	node->info.index = blk_index;
-	node->next = list->head;
-	
-	if (!list->head)
-		list->tail = node;
-
-	list->head = node;
-}
-
 static void add_back_list(list_t *list, Blk *blk, int blk_index) {
 	node_t *node = (node_t *) malloc(sizeof(node_t));
 	node->info.blk = blk;
@@ -83,7 +71,7 @@ static list_t init_worklist(Fn *fn) {
 
 	int index = 0;
 	for (Blk *blk = fn->start; blk; blk = blk->link) {
-		add_to_list(&worklist, blk, index);
+		add_back_list(&worklist, blk, index);
 		index++;
 	}
 
@@ -144,11 +132,9 @@ static void print_set(Fn *fn, BSet bset) {
 	printf("\n");
 }
 
-static BSet update_out(BSet *out, BSet *def, BSet *use, Blk *succ, Fn *fn) {
-	BSet result = init_zeroset(fn->ntmp);
-
+static void update_out(BSet *out_new, BSet *out, BSet *def, BSet *use, Blk *succ, Fn *fn) {
 	if (!succ)
-		return result;
+		return;
 
 	int succ_index = blk2idx(fn, succ);
 
@@ -162,11 +148,12 @@ static BSet update_out(BSet *out, BSet *def, BSet *use, Blk *succ, Fn *fn) {
 	// 	print_set(fn, use[succ_index]);
 	// }
 
+	BSet result = init_zeroset(fn->ntmp);
+
 	bscopy(&result, &out[succ_index]);
 	bsdiff(&result, &def[succ_index]);
 	bsunion(&result, &use[succ_index]);
-
-	return result;
+	bsunion(out_new, &result);
 }
 
 static void readfn (Fn *fn) {
@@ -192,13 +179,9 @@ static void readfn (Fn *fn) {
 		block_info_t info = pop_list(&worklist);
 		// printf("Iterate block '%s':\n", info.blk->name);		
 		
-		BSet out_new;
-		out_new = init_zeroset(fn->ntmp);
-		BSet new_s1 = update_out(out, def, use, info.blk->s1, fn);
-		BSet new_s2 = update_out(out, def, use, info.blk->s2, fn);
-
-		bsunion(&out_new, &new_s1);
-		bsunion(&out_new, &new_s2);
+		BSet out_new = init_zeroset(fn->ntmp);
+		update_out(&out_new, out, def, use, info.blk->s1, fn);
+		update_out(&out_new, out, def, use, info.blk->s2, fn);
 
 		// if (!strcmp(info.blk->name, "l11")) {
 		// 	printf("out_new:");
