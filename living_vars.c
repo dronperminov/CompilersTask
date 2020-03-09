@@ -64,16 +64,42 @@ static uint bsget(BSet *set, int index) {
 }
 
 /******************************* ALGORITHM PART *******************************/
+static int blk2idx(Fn *fn, Blk *block) {
+	int index = 0;
+
+	for (Blk *blk = fn->start; blk; blk = blk->link) {
+		if (blk == block)
+			return index;
+
+		index++;
+	}
+
+	printf("this unreally\n");
+}
+
+static void add_all(list_t *list, Blk *blk, Fn *fn) {
+	node_t *node = list->head;
+	while (node && node->info.blk != blk)
+		node = node->next;
+
+	if (node)
+		return;
+
+	add_back_list(list, blk, blk2idx(fn, blk));
+	
+	for (int i = 0; i < blk->npred; i++) {
+		add_all(list, blk->pred[i], fn);
+	}	
+}
+
 static list_t init_worklist(Fn *fn) {
 	list_t worklist;
 	worklist.head = NULL;
 	worklist.tail = NULL;
 
-	int index = 0;
-	for (Blk *blk = fn->start; blk; blk = blk->link) {
-		add_back_list(&worklist, blk, index);
-		index++;
-	}
+	for (Blk *blk = fn->start; blk; blk = blk->link)
+		if (!blk->s1 && !blk->s2)
+			add_all(&worklist, blk, fn);
 
 	return worklist;
 }
@@ -109,19 +135,6 @@ static void make_def_use(Blk *blk, BSet *def, BSet *use, Fn *fn) {
 			bsset(def, to);
 		}
 	}
-}
-
-static int blk2idx(Fn *fn, Blk *block) {
-	int index = 0;
-
-	for (Blk *blk = fn->start; blk; blk = blk->link) {
-		if (blk == block)
-			return index;
-
-		index++;
-	}
-
-	printf("this unreally\n");
 }
 
 static void print_set(Fn *fn, BSet bset) {
