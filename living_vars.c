@@ -181,12 +181,9 @@ static void readfn (Fn *fn) {
 	}
 	
 	list_t worklist = init_worklist(fn);
-	node_t *node = worklist.head;
 
-	while (node) {
+	for (node_t *node = worklist.head; node; node = node->next)
 		make_def_use(node->info.blk, &def[node->info.index], &use[node->info.index], fn);
-		node = node->next;
-	}
 
 	while (worklist.head) {
 		block_info_t info = pop_list(&worklist);
