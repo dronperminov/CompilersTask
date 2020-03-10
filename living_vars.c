@@ -110,59 +110,34 @@ static void make_def_use(Blk *blk, BSet *def, BSet *use, Fn *fn) {
 		int arg2 = blk->ins[i].arg[1].val;
 		int to = blk->ins[i].to.val;
 
-		// if ((Tmp0 <= arg1 && !strcmp(fn->tmp[arg1].name, "e")) ||
-		// 	(Tmp0 <= arg2 && !strcmp(fn->tmp[arg2].name, "e")) ||
-		// 	(Tmp0 <= to && !strcmp(fn->tmp[to].name, "e")))
-		// 	printf("got 'e' at block '%s'", blk->name);
-
-		if (Tmp0 <= arg1 && !bsget(def, arg1)) {
-			// if (!strcmp(fn->tmp[arg1].name, "e"))
-			// 	printf("got 'e' at block '%s' as use arg0", blk->name);
+		if (Tmp0 <= arg1 && !bsget(def, arg1))
 			bsset(use, arg1);
-		}
 
-		if (Tmp0 <= arg2 && !bsget(def, arg2)) {
-			// if (!strcmp(fn->tmp[arg2].name, "e"))
-			// 	printf("got 'e' at block '%s' as use arg1", blk->name);
-
+		if (Tmp0 <= arg2 && !bsget(def, arg2))
 			bsset(use, arg2);
-		}
 				
-		if (Tmp0 <= to/* && !bsget(use, arg2)*/) {
-			// if (!strcmp(fn->tmp[to].name, "e"))
-			// 	printf("got 'e' at block '%s' as def to", blk->name);
-
+		if (Tmp0 <= to)
 			bsset(def, to);
-		}
 	}
+
+	int arg = blk->jmp.arg.val;
+	if (Tmp0 <= arg && !bsget(def, arg))
+		bsset(use, arg);
 }
 
 static void print_set(Fn *fn, BSet bset) {
-	printf("size: %d\t", bset.nt);
 	for (int i = 0; i < fn->ntmp; i++)
 		if (bsget(&bset, i))
 			printf(" %%%s", fn->tmp[i].name);
-	printf("\n");
 }
 
 static void update_out(BSet *out_new, BSet *out, BSet *def, BSet *use, Blk *succ, Fn *fn) {
 	if (!succ)
 		return;
 
-	int succ_index = blk2idx(fn, succ);
-
-	// if (!strcmp(succ->name, "l13") || !strcmp(succ->name, "l14")) {
-	// 	printf("BLOCK: %s\n", succ->name);
-	// 	printf("\tOUT: ");
-	// 	print_set(fn, out[succ_index]);
-	// 	printf("\tDEF: ");
-	// 	print_set(fn, def[succ_index]);
-	// 	printf("\tUSE: ");
-	// 	print_set(fn, use[succ_index]);
-	// }
-
 	BSet result = init_zeroset(fn->ntmp);
 
+	int succ_index = blk2idx(fn, succ);
 	bscopy(&result, &out[succ_index]);
 	bsdiff(&result, &def[succ_index]);
 	bsunion(&result, &use[succ_index]);
@@ -174,33 +149,33 @@ static void readfn (Fn *fn) {
 	BSet def[fn->nblk];
 	BSet use[fn->nblk];
 
+	Blk *blk = fn->start;
 	for (int i = 0; i < fn->nblk; i++) {
 		out[i] = init_zeroset(fn->ntmp);
 		def[i] = init_zeroset(fn->ntmp);
-		use[i] = init_zeroset(fn->ntmp);		
+		use[i] = init_zeroset(fn->ntmp);
+		make_def_use(blk, &def[i], &use[i], fn);
+		blk = blk->link;
 	}
+
+	int changed = 1;
 	
-	list_t worklist = init_worklist(fn);
+	while (changed) {
+		changed = 0;
+		list_t worklist = init_worklist(fn);
 
-	for (node_t *node = worklist.head; node; node = node->next)
-		make_def_use(node->info.blk, &def[node->info.index], &use[node->info.index], fn);
+		while (worklist.head) {
+			block_info_t info = pop_list(&worklist);
 
-	while (worklist.head) {
-		block_info_t info = pop_list(&worklist);
-		// printf("Iterate block '%s':\n", info.blk->name);		
-		
-		BSet out_new = init_zeroset(fn->ntmp);
-		update_out(&out_new, out, def, use, info.blk->s1, fn);
-		update_out(&out_new, out, def, use, info.blk->s2, fn);
+			BSet out_new = init_zeroset(fn->ntmp);
+			update_out(&out_new, out, def, use, info.blk->s1, fn);
+			update_out(&out_new, out, def, use, info.blk->s2, fn);
 
-		// if (!strcmp(info.blk->name, "l11")) {
-		// 	printf("out_new:");
-		// 	print_set(fn, out_new);
-		// }
-
-		if (!bsequal(&out_new, &out[info.index])) {
-			bscopy(&out[info.index], &out_new);
-			add_back_list(&worklist, info.blk, info.index);
+			if (!bsequal(&out_new, &out[info.index])) {
+				bscopy(&out[info.index], &out_new);
+				add_back_list(&worklist, info.blk, info.index);
+				changed = 1;
+			}
 		}
 	}
 
@@ -213,10 +188,7 @@ static void readfn (Fn *fn) {
 
 		printf("@%s\n", blk->name);
 		printf("\tlv_out =");
-
-		for (int i = 0; i < fn->ntmp; i++)
-			if (bsget(&out[index], i))
-				printf(" %%%s", fn->tmp[i].name);
+		print_set(fn, out[index]);
 
 		is_printed = 1;
 		index++;
