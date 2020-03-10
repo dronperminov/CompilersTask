@@ -68,10 +68,14 @@ export function $sieve(w %n, l %prime) {
 @fill2.header
 	lv_out =
 --- Correct: size 99 ---
-@fill2.header lv_out =
-@fill0.exit   lv_out =
-@fill0.body   lv_out =
-@fill0.cond   lv_out = %prime
+@fill2.header
+	lv_out =
+@fill0.exit
+	lv_out =
+@fill0.body
+	lv_out =
+@fill0.cond
+	lv_out = %prime
 
 --- Stderr: size 0 ---
 
